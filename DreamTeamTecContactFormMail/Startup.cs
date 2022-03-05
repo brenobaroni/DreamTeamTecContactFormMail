@@ -1,5 +1,6 @@
 using Domain.Entities;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
@@ -29,7 +30,6 @@ namespace DreamTeamTecContactFormMail
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-
             services.Configure<EmailSettings>(Configuration.GetSection("EmailSettings"));
             services.AddScoped<IEmailService, EmailService>();
             services.AddControllers();
@@ -38,11 +38,19 @@ namespace DreamTeamTecContactFormMail
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "DreamTeamTecContactFormMail", Version = "v1" });
             });
 
+            services.AddCors(options =>
+            {
+                options.AddPolicy("AllowSpecificOrigin",
+                    builder => builder.WithOrigins(this.Configuration.GetSection("FrontUrl").Value).AllowAnyHeader()
+                    .AllowAnyMethod()); ;
+            });
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -50,16 +58,20 @@ namespace DreamTeamTecContactFormMail
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "DreamTeamTecContactFormMail v1"));
             }
 
+            app.UseCors("AllowSpecificOrigin");
+
+
             app.UseHttpsRedirection();
 
             app.UseRouting();
-
+            app.UseCors("SiteCorsPolicy");
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
             });
+
         }
     }
 }

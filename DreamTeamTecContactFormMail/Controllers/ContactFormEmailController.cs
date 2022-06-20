@@ -23,7 +23,6 @@ namespace DreamTeamTecContactFormMail.Controllers
 
         [HttpPost]
         [Route("EnviarForm")]
-        [AllowAnonymous]
         public async Task<IActionResult> EnviarContactForm([FromBody] ContactFormModel contactFormModel)
         {
             try

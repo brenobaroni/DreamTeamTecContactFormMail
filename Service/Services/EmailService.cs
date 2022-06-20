@@ -1,6 +1,8 @@
 ﻿using Domain.Entities;
 using Domain.Models;
 using Microsoft.Extensions.Options;
+using Repository.Domain;
+using Repository.Repository.Contracts;
 using Service.Interfaces;
 using System;
 using System.ComponentModel;
@@ -15,10 +17,13 @@ namespace Service
     {
         private readonly EmailSettings _emailSettings;
         static bool mailSent = false;
+        private readonly ILeadsRepository _leadsRepository;
 
-        public EmailService(IOptions<EmailSettings> emailSettings)
+        public EmailService(IOptions<EmailSettings> emailSettings, ILeadsRepository leadsRepository)
         {
             _emailSettings = emailSettings.Value;
+            _leadsRepository = leadsRepository;
+
         }
         public async Task<bool> EnviarFormEmailAsync(ContactFormModel model)
         {
@@ -29,7 +34,7 @@ namespace Service
                     try
                     {
                         mailMessage.From = new MailAddress(_emailSettings.Mail, _emailSettings.DisplayName);
-                        mailMessage.To.Add(new MailAddress(_emailSettings.Mail));
+                        mailMessage.To.Add(new MailAddress(_emailSettings.To));
                         mailMessage.Subject = "Contato Recebido";
                         mailMessage.IsBodyHtml = true;
                         string msgBody =
@@ -37,19 +42,20 @@ namespace Service
                             $"<p><b>Nome: </b> {model.Nome} </p>" +
                             $"<p><b>E-mail: </b> {model.Email}</p>" +
                             $"<p><b>Telefone: </b> {model.Telefone}</p>" +
-                            $"<p><b>Mensagem: </b> {model.Mensagem}</p>";
+                            $"<p><b>Mensagem: </b> {model.Mensagem}</p>" +
+                            $"<p><b>Horário: </b> {DateTime.Now.ToString("dd/MM/yyy HH:mm:ss")}</p>";
                         mailMessage.Body = msgBody;
+                        mailMessage.IsBodyHtml = true;
                         smtp.Port = _emailSettings.Port;
                         smtp.Host = _emailSettings.Host;
                         smtp.UseDefaultCredentials = false;
-                        smtp.Credentials = new NetworkCredential(_emailSettings.Mail, _emailSettings.Password);
                         smtp.EnableSsl = true;
-                        //smtp.DeliveryMethod = SmtpDeliveryMethod.Network;
-
+                        smtp.Credentials = new NetworkCredential(_emailSettings.Mail, _emailSettings.Password, _emailSettings.Host);
+                        smtp.DeliveryMethod = SmtpDeliveryMethod.Network;
+                        
                         await smtp.SendMailAsync(mailMessage);
 
-                        smtp.SendCompleted += new
-                                SendCompletedEventHandler(SendCompletedCallback);
+                        await SendCompletedCallback(model);
 
                         return true;
 
@@ -63,9 +69,17 @@ namespace Service
 
         }
 
-        private void SendCompletedCallback(object sender, AsyncCompletedEventArgs e)
+        private async Task SendCompletedCallback(ContactFormModel model)
         {
-            mailSent = true;
+            var lead = new Leads()
+            {
+                Nome = model.Nome,
+                Email = model.Email,
+                Mensagem = model.Mensagem,
+                Telefone = model.Telefone,
+            };
+
+            await _leadsRepository.SaveAsync(lead);
         }
     }
 }

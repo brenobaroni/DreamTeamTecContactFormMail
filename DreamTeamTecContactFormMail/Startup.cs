@@ -1,20 +1,18 @@
 using Domain.Entities;
+using DreamTeamTecContactFormMail.Middleware;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
+using Repository.Context;
+using Repository.Repository;
+using Repository.Repository.Contracts;
 using Service;
 using Service.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+
 
 namespace DreamTeamTecContactFormMail
 {
@@ -30,12 +28,27 @@ namespace DreamTeamTecContactFormMail
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.Configure<EmailSettings>(Configuration.GetSection("EmailSettings"));
+            services.AddScoped<ILeadsRepository, LeadsRepository>();
             services.AddScoped<IEmailService, EmailService>();
+            services.Configure<EmailSettings>(Configuration.GetSection("EmailSettings"));
+
+            services.AddDbContext<DtContext>(options =>
+            {
+                var connectionString = Configuration.GetConnectionString("WebApiDatabase");
+                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+            });
+
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "DreamTeamTecContactFormMail", Version = "v1" });
+                c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme()
+                {
+                    Type = SecuritySchemeType.ApiKey,
+                    In = ParameterLocation.Header,
+                    Name = "XApiKey",
+                    Description = "ApiKey Authentication"
+                });
             });
 
             services.AddCors(options =>
@@ -60,6 +73,7 @@ namespace DreamTeamTecContactFormMail
 
             app.UseCors("AllowSpecificOrigin");
 
+            //app.UseMiddleware<MiddlewareApiKey>();
 
             app.UseHttpsRedirection();
 
